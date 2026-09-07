@@ -172,6 +172,9 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 #toast.bad{background:var(--bad);color:#fff}
 #toast.good{background:var(--good);color:#fff}
 .ov{position:fixed;inset:0;background:rgba(9,13,18,.5);display:flex;align-items:center;justify-content:center;z-index:30;padding:20px}
+/* 확인 대화상자는 다른 모달 위에서 열린다. z-index 가 같으면 DOM 순서가 이기므로
+   #pmodal 에 가려졌다. #toast(40) 보다는 아래에 둔다. */
+#modal{z-index:36}
 .modalcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:20px;max-width:420px;width:100%;display:grid;gap:16px;max-height:88vh;overflow-y:auto}
 .modalcard.wide{max-width:560px}
 .modalcard h3{font-size:15px}
