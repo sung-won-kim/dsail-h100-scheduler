@@ -398,7 +398,7 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 
   <section id="tab-members" hidden>
     <div class="card">
-      <h2>멤버별 크레딧 현황 <span class="sub">단위는 GPU·시간. 막대는 진한 색이 이미 지난 사용량, 연한 색이 예정된 예약</span></h2>
+      <h2>멤버별 크레딧 현황 <span class="sub">단위는 GPU·시간. 막대는 진한 색이 이미 지난 사용량, 연한 색이 예정된 예약. 잔여 합계에서 무제한 멤버는 빠집니다</span></h2>
       <div class="tablewrap"><table class="members" id="memberTable"></table></div>
     </div>
   </section>
@@ -411,6 +411,7 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
         <li><b>1 크레딧 = H100 1장을 1시간</b> 쓰는 권리입니다. 예약은 정시 단위로 잡습니다.</li>
         <li>시즌 총 공급은 8장 × 182일 × 24시간 = <code>34,944</code> 시간입니다. 박사·석사 26명에게 <code>1,344</code>시간씩 균등 배정합니다. 한 사람당 GPU 1장 기준 56일치이고, 남는 크레딧은 없습니다.</li>
         <li>크레딧은 멤버끼리 자유롭게 주고받을 수 있습니다. 급하면 요청 게시판에 올리고, 여유가 있는 사람이 보내주면 됩니다.</li>
+        <li>운영을 맡은 멤버는 잔액 제한 없이 예약합니다(멤버 현황에 <b>무제한</b>으로 표시). 사용 시간은 똑같이 기록되므로 얼마나 썼는지는 모두가 볼 수 있고, 잔여 합계에서만 빠집니다.</li>
         <li>시즌(2027-03-31)이 끝나면 남은 크레딧은 사라집니다. 미리 나눠 쓰세요.</li>
       </ul>
       <h3>예약</h3>
@@ -869,6 +870,10 @@ async function runDiag(){
 // ---------- identity ----------
 // 관리자는 로그인이 아니라 이 명단으로 정합니다. 아래에 멤버 id를 넣으면 관리자 탭이 보입니다.
 const ADMINS=['sungwon-kim'];
+// 크레딧 잔액 제한을 받지 않는 멤버. 예약·송금에서 잔액 검사를 건너뜁니다.
+// 사용량은 그대로 기록되므로 멤버 현황의 사용·예정 숫자는 계속 실제 값입니다.
+const UNLIMITED=['sungwon-kim'];
+const isUnlimited=id=>UNLIMITED.includes(id);
 const SYSTEM_ID='__system';       // 관리자 지급/회수의 상대편. 실제 멤버가 아닙니다.
 const SYSTEM_NAME='운영 (관리자)';
 const isAdmin=()=>ADMINS.includes(me());
@@ -902,6 +907,7 @@ function stats(id){
   return {initial,sent,recv,used,planned,fee,balance:initial+recv-sent-used-planned-fee};
 }
 const balanceOf=id=>stats(id).balance;
+const balText=id=>isUnlimited(id)?'무제한':nf(balanceOf(id));
 // Most GPUs this member holds at once during [a,z), counting existing bookings plus `extra` new ones.
 function peakConcurrent(id,a,z,extra){
   const ev=[[a,extra],[z,-extra]];
@@ -951,7 +957,7 @@ function renderIdentity(){
   sel.innerHTML=opts.join('');
   const has=!!(cur&&state.members[cur]);
   $('#pickNotice').hidden=has;
-  $('#myBal').textContent=has?nf(balanceOf(cur)):'–';
+  $('#myBal').textContent=has?(isUnlimited(cur)?'∞':nf(balanceOf(cur))):'–';
   $('#bookBtn').disabled=!has;
   const pb=$('#mePhotoBtn');pb.hidden=!has;
   if(has)pb.innerHTML=avatar(cur,30);
@@ -1015,8 +1021,8 @@ function renderCost(){
   const g=gpusSelected().length,r=formRange(),cur=me();
   const hrs=r&&r.z>r.a?r.z-r.a:0,cost=g*hrs;
   $('#costVal').textContent=nf(cost);
-  const bal=cur&&state.members[cur]?balanceOf(cur):null;
-  $('#costAfter').textContent=(g&&hrs)?('= '+g+'장 × '+hrs+'시간'+(bal!==null?' · 예약 후 잔여 '+nf(bal-cost):'')):'';
+  const un=isUnlimited(cur),bal=(cur&&state.members[cur]&&!un)?balanceOf(cur):null;
+  $('#costAfter').textContent=(g&&hrs)?('= '+g+'장 × '+hrs+'시간'+(un?' · 잔액 제한 없음':(bal!==null?' · 예약 후 잔여 '+nf(bal-cost):''))):'';
   $('#costBox').classList.toggle('over',bal!==null&&cost>bal);
   const hint=$('#parallelHint');
   if(cur&&g&&hrs){const pk=peakConcurrent(cur,r.a,r.z,g);hint.textContent=pk>=PARALLEL_SOFT_CAP?'· 동시 '+pk+'장, 배려 안내가 뜹니다':'';}
@@ -1051,7 +1057,8 @@ function renderTiles(){
   const s=stats(cur);
   const tile=(k,v,u,cls)=>'<div class="tile '+(cls||'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="u">'+u+'</div></div>';
   el.innerHTML=
-    tile('잔여',nf(s.balance),'GPU 1장 기준 '+Math.floor(s.balance/24)+'일치','main')+
+    (isUnlimited(cur)?tile('잔여','무제한','잔액 제한 없이 예약할 수 있습니다','main')
+                    :tile('잔여',nf(s.balance),'GPU 1장 기준 '+Math.floor(s.balance/24)+'일치','main'))+
     tile('초기 배정',nf(s.initial),'시간')+
     tile('사용 + 예정',nf(s.used)+' + '+nf(s.planned),'시간')+
     tile('주고받음','−'+nf(s.sent)+' / +'+nf(s.recv),'보냄 / 받음')+
@@ -1071,7 +1078,7 @@ function renderRequests(){
     let act='';
     if(r.status==='open'){
       if(r.member===cur)act='<button class="btn small" data-reqcancel="'+esc(r.id)+'">요청 취소</button>';
-      else if(cur)act='<button class="btn small primary" data-fulfill="'+esc(r.id)+'"'+(balanceOf(cur)<r.amount?' disabled title="잔여 크레딧 부족"':'')+'>'+nf(r.amount)+' 보내기</button>';
+      else if(cur)act='<button class="btn small primary" data-fulfill="'+esc(r.id)+'"'+((!isUnlimited(cur)&&balanceOf(cur)<r.amount)?' disabled title="잔여 크레딧 부족"':'')+'>'+nf(r.amount)+' 보내기</button>';
     } else act='<span class="pill good">'+esc(memberName(r.fulfilledBy))+' 님이 보냄</span>';
     return '<div class="item"><div><div class="t">'+whoTag(r.member,24)+'<span class="num">'+nf(r.amount)+'</span> 시간</div>'+
       '<div class="s">'+esc(r.reason)+' · '+fmtTs(r.createdAt)+'</div></div><div class="itemacts">'+act+'</div></div>';
@@ -1100,11 +1107,12 @@ function renderMembers(){
   const tot={initial:0,used:0,planned:0,fee:0,balance:0};
   for(const id of ids){
     const m=state.members[id],s=stats(id);
-    tot.initial+=s.initial;tot.used+=s.used;tot.planned+=s.planned;tot.fee+=s.fee;tot.balance+=s.balance;
+    tot.initial+=s.initial;tot.used+=s.used;tot.planned+=s.planned;tot.fee+=s.fee;
+    if(!isUnlimited(id))tot.balance+=s.balance;  // 무제한 멤버의 음수 잔액이 합계를 흐리지 않게
     const base=Math.max(1,s.initial+s.recv);
-    h+='<tr class="'+(id===cur?'mine':'')+'"><td>'+whoTag(id,28)+'</td><td><span class="pill">'+esc(ROLE_LABEL[m.role]||m.role)+'</span></td>'+
+    h+='<tr class="'+(id===cur?'mine':'')+'"><td>'+whoTag(id,28)+'</td><td><span class="pill">'+esc(ROLE_LABEL[m.role]||m.role)+'</span>'+(isUnlimited(id)?' <span class="pill accent">무제한</span>':'')+'</td>'+
       '<td class="n">'+nf(s.initial)+'</td><td class="n">'+nf(s.used)+'</td><td class="n">'+nf(s.planned)+'</td><td class="n">'+(s.fee?nf(s.fee):'–')+'</td>'+
-      '<td class="n">'+nf(s.sent)+'</td><td class="n">'+nf(s.recv)+'</td><td class="n"><b>'+nf(s.balance)+'</b></td>'+
+      '<td class="n">'+nf(s.sent)+'</td><td class="n">'+nf(s.recv)+'</td><td class="n"><b>'+balText(id)+'</b></td>'+
       '<td><div class="bar"><i class="used" style="width:'+Math.min(100,100*s.used/base)+'%"></i><i class="planned" style="width:'+Math.min(100,100*s.planned/base)+'%"></i></div></td></tr>';
   }
   h+='</tbody><tfoot><tr><td colspan="2" style="color:var(--ink-3)">합계</td><td class="n">'+nf(tot.initial)+'</td><td class="n">'+nf(tot.used)+'</td><td class="n">'+nf(tot.planned)+'</td><td class="n">'+nf(tot.fee)+'</td><td></td><td></td><td class="n"><b>'+nf(tot.balance)+'</b></td><td></td></tr></tfoot>';
@@ -1168,8 +1176,8 @@ function openHours(g,date){
     });
     const hrs=bd&&selB!==null?bd.hi-bd.lo+1:0;
     $('#hmVal').textContent=nf(hrs);
-    const bal=cur&&state.members[cur]?balanceOf(cur):null;
-    $('#hmAfter').textContent=hrs?('= '+h2(bd.lo)+'–'+h2(bd.hi+1)+' · GPU 1장'+(bal!==null?' · 예약 후 잔여 '+nf(bal-hrs):'')):'시작 시각을 눌러주세요';
+    const un=isUnlimited(cur),bal=(cur&&state.members[cur]&&!un)?balanceOf(cur):null;
+    $('#hmAfter').textContent=hrs?('= '+h2(bd.lo)+'–'+h2(bd.hi+1)+' · GPU 1장'+(un?' · 잔액 제한 없음':(bal!==null?' · 예약 후 잔여 '+nf(bal-hrs):''))):'시작 시각을 눌러주세요';
     const bad=!hrs?'시간대를 선택해 주세요.':(bal!==null&&hrs>bal?'크레딧이 부족합니다.':'');
     setMsg('#hmMsg',bad);$('#hmOk').disabled=!!bad;$('#hmFill').disabled=!hrs;
   };
@@ -1347,7 +1355,7 @@ async function doBook(gpus,a,z,memo){
   if(a<0||z>SEASON_HOURS)return '시즌 기간(2026-10-01 ~ 2027-03-31) 안에서만 예약할 수 있습니다.';
   if(a<nowIdx())return '지난 시각은 예약할 수 없습니다.';
   const cost=gpus.length*(z-a),bal=balanceOf(cur);
-  if(cost>bal)return '크레딧이 부족합니다. 필요 '+nf(cost)+'시간, 잔여 '+nf(bal)+'시간. 요청 게시판에 올려보세요.';
+  if(!isUnlimited(cur)&&cost>bal)return '크레딧이 부족합니다. 필요 '+nf(cost)+'시간, 잔여 '+nf(bal)+'시간. 요청 게시판에 올려보세요.';
   const c=conflictWith(gpus,a,z);
   if(c)return '충돌 · H100 #'+c.hit.join(',#')+'은(는) '+rangeText(c.b.from,c.b.to)+'에 '+memberName(c.b.member)+' 님이 예약했습니다.';
   const pk=peakConcurrent(cur,a,z,gpus.length);
@@ -1401,7 +1409,7 @@ async function transfer(ev){
   const to=$('#xTo').value,amt=Math.floor(+$('#xAmt').value),note=$('#xNote').value.trim();
   if(!to)return setMsg('#xferMsg','받는 사람을 선택해 주세요.');
   if(!(amt>=1))return setMsg('#xferMsg','1 이상의 정수를 입력해 주세요.');
-  if(amt>balanceOf(cur))return setMsg('#xferMsg','잔여 크레딧('+nf(balanceOf(cur))+'시간)보다 많이 보낼 수 없습니다.');
+  if(!isUnlimited(cur)&&amt>balanceOf(cur))return setMsg('#xferMsg','잔여 크레딧('+nf(balanceOf(cur))+'시간)보다 많이 보낼 수 없습니다.');
   if(!await ask(memberName(to)+' 님에게 '+nf(amt)+' 크레딧('+amt+'시간)을 보낼까요?\n\n보낸 크레딧은 상대가 다시 보내주기 전에는 돌려받을 수 없습니다.','보내기'))return;
   try{await store.add('transfers',{from:cur,to,amount:amt,note,createdAt:new Date().toISOString()});
     toast(memberName(to)+' 님에게 '+nf(amt)+' 크레딧을 보냈습니다.','good');
@@ -1421,7 +1429,7 @@ async function postRequest(ev){
 async function fulfill(id){
   const cur=me(),r=state.requests.find(x=>x.id===id);
   if(!cur||!r||r.status!=='open')return;
-  if(r.amount>balanceOf(cur))return toast('잔여 크레딧이 부족합니다.','bad');
+  if(!isUnlimited(cur)&&r.amount>balanceOf(cur))return toast('잔여 크레딧이 부족합니다.','bad');
   if(!await ask(memberName(r.member)+' 님의 요청에 '+nf(r.amount)+' 크레딧을 보낼까요?\n\n사유: '+r.reason,'보내기'))return;
   try{
     await store.add('transfers',{from:cur,to:r.member,amount:r.amount,note:'요청 응답: '+r.reason,createdAt:new Date().toISOString()});
@@ -1464,9 +1472,10 @@ async function admMove(give){
   if(!to)return setMsg('#admGrantMsg','대상을 선택해 주세요.');
   if(!(amt>=1))return setMsg('#admGrantMsg','1 이상의 정수를 입력해 주세요.');
   const label=give?'지급':'회수';
-  if(!give&&amt>balanceOf(to))
+  if(!give&&!isUnlimited(to)&&amt>balanceOf(to))
     return setMsg('#admGrantMsg',memberName(to)+' 님의 잔여('+nf(balanceOf(to))+'시간)보다 많이 회수할 수 없습니다.');
-  if(!await ask(memberName(to)+' 님에게 '+nf(amt)+' 크레딧을 '+label+'합니다.\n\n잔여 '+nf(balanceOf(to))+' → '+nf(balanceOf(to)+(give?amt:-amt))+
+  const after=isUnlimited(to)?'무제한':nf(balanceOf(to)+(give?amt:-amt));
+  if(!await ask(memberName(to)+' 님에게 '+nf(amt)+' 크레딧을 '+label+'합니다.\n\n잔여 '+balText(to)+' → '+after+
     '\n거래 내역에 '+memberName(cur)+' 님의 이름과 사유가 함께 남습니다.',label))return;
   const rec=give?{from:SYSTEM_ID,to}:{from:to,to:SYSTEM_ID};
   try{
