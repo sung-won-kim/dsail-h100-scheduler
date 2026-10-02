@@ -505,6 +505,57 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
         </tbody>
       </table></div>
     </div>
+
+    <div class="card rules" id="adminManual" hidden style="margin-top:16px">
+      <h2>관리자 매뉴얼 <span class="sub">관리자 이름을 선택했을 때만 보입니다. 화면에서 숨길 뿐 페이지 소스에는 공개되므로 비밀번호·키는 적지 마세요</span></h2>
+
+      <h3>0. 계정 두 개를 구분하기</h3>
+      <ul>
+        <li><b>관리자 계정</b> <code>nvidia</code> (sudo 가능) — 멤버 추가·서버 관리용. 내 Mac에서 <code>brev shell dsail-geotransfer</code></li>
+        <li><b>내 멤버 계정</b> — 평소 작업용. <code>ssh dsail_h100</code></li>
+        <li>멤버 관리 파일은 관리자 계정의 <code>~/lab-admin/</code>에 있습니다: <code>add_users.sh</code>(계정 생성 스크립트), <code>users.txt</code>(아이디·공개키 명단)</li>
+      </ul>
+
+      <h3>1. 멤버 추가</h3>
+      <ol>
+        <li>멤버에게 "<b>서버 접속 탭 1번</b>대로 아이디와 공개키를 보내주세요"라고 안내합니다.</li>
+        <li>받은 키가 <code>ssh-ed25519 AAAA...</code> 한 줄인지 확인합니다. <code>-----BEGIN OPENSSH PRIVATE KEY-----</code>면 개인키이므로 지우게 하고 새 키를 만들어 <code>.pub</code>을 다시 받습니다.</li>
+        <li>관리자 계정에서 명단에 추가하고 스크립트를 실행합니다(작은따옴표 유지). <code>ok: 아이디</code>가 나오면 성공입니다.</li>
+      </ol>
+      <div class="cmd"><pre>echo '아이디 ssh-ed25519 AAAA...받은 키 전체...' >> ~/lab-admin/users.txt
+bash ~/lab-admin/add_users.sh</pre><button class="btn small" data-copy>복사</button></div>
+      <ol start="4">
+        <li>확인: <code>id 아이디</code> → 그룹에 <code>dsail</code>이 있고 <code>sudo</code>는 없어야 합니다.</li>
+        <li>멤버에게 "<b>계정 만들었어요. 서버 접속 탭 2번부터</b> 따라 하세요"라고 알려줍니다.</li>
+      </ol>
+
+      <h3>2. 멤버 삭제</h3>
+      <div class="cmd"><pre>sudo deluser --remove-home 아이디</pre><button class="btn small" data-copy>복사</button></div>
+      <ul>
+        <li>파일을 남기려면 <code>--remove-home</code>을 빼세요.</li>
+        <li><code>~/lab-admin/users.txt</code>에서도 그 줄을 지워야 스크립트를 다시 돌렸을 때 되살아나지 않습니다.</li>
+      </ul>
+
+      <h3>3. 멤버가 접속을 못 할 때</h3>
+      <ul>
+        <li><b>Permission denied (publickey)</b> — 멤버의 <code>cat ~/.ssh/id_ed25519.pub</code>와 서버의 <code>sudo cat /home/아이디/.ssh/authorized_keys</code>를 비교합니다. 다르면 새 키를 <code>users.txt</code>에 한 줄 더 추가하고 스크립트를 다시 실행합니다.</li>
+        <li><b>Connection timed out</b> — Brev 콘솔에서 인스턴스가 Running인지 확인합니다.</li>
+        <li>지금 누가 접속해 있는지: <code>who</code> · GPU 사용 현황: <code>nvitop</code></li>
+      </ul>
+
+      <h3>4. 서버 관리 시 주의할 것</h3>
+      <ul>
+        <li><b>NVIDIA 드라이버를 apt로 건드리지 마세요.</b> 이 서버의 드라이버(595)는 apt가 관리하지 않습니다. apt로 nvitop을 설치했다가 610 라이브러리가 섞여 <code>Driver/library version mismatch</code>가 난 적이 있어서, Ubuntu의 NVIDIA 패키지는 <code>/etc/apt/preferences.d/no-ubuntu-nvidia</code>로 막아두었습니다. 같은 에러가 나면 재부팅으로는 안 고쳐지고, 섞여 들어온 패키지를 지워야 합니다.</li>
+        <li><b>Brev 콘솔의 TCP 포트 40355(→22)를 지우지 마세요.</b> 멤버 전원이 이 포트로 접속합니다. 다시 만들면 번호가 바뀌어 모두 설정을 고쳐야 합니다.</li>
+        <li><b>"Share SSH Access"(베타)는 쓰지 마세요.</b> 한번 추가하면 제거할 수 없습니다.</li>
+        <li><b>디스크</b> — 홈 폴더가 있는 <code>/</code>는 193GB뿐입니다. 큰 데이터는 <code>/data</code>(17TB)에 두세요. <code>/ephemeral</code>(5.9TB)은 인스턴스를 멈추면 지워질 수 있는 임시 공간입니다. 확인: <code>df -h / /data /ephemeral</code></li>
+        <li>NVIDIA 패키지는 <code>sudo apt-mark hold</code> 대신 위 차단 파일로 관리합니다. 커널 업데이트 뒤 GPU가 안 잡히면 <code>dkms status</code>를 확인하세요.</li>
+      </ul>
+
+      <h3>5. 백업</h3>
+      <p>멤버를 추가할 때마다 명단을 내 Mac으로 복사해 둡니다.</p>
+      <div class="cmd"><pre>scp -r dsail-geotransfer:~/lab-admin ~/Desktop/</pre><button class="btn small" data-copy>복사</button></div>
+    </div>
   </section>
 
   <section id="tab-admin" hidden>
@@ -1520,6 +1571,7 @@ async function cancelRequest(id){
 function renderAdmin(){
   const on=isAdmin();
   $('#adminTab').hidden=!on;
+  $('#adminManual').hidden=!on;
   if(!on){
     // 관리자가 아닌 이름으로 바꾸면 관리자 탭에서 빠져나옵니다
     if(!$('#tab-admin').hidden){const b=document.querySelector('nav [data-tab="schedule"]');if(b)b.click();}
