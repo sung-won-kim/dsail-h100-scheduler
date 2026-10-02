@@ -78,6 +78,8 @@ git push -u origin main
 
 **멤버 추가/삭제** — `index.html`의 `ROSTER`(이름·학위과정)와 `ROSTER_SEED`(초기 크레딧)를 수정하고, 이미 시딩이 끝난 뒤라면 Supabase **Table Editor**에서 `dsail_rows`에 `coll=members`, `id=<영문-아이디>`, `data={"name":"...","role":"phd","initial":1344}` 행을 직접 추가하세요.
 
+**서버 접속 탭** — H100 서버 SSH 접속 매뉴얼입니다. 접속 주소나 포트가 바뀌면 `index.html` 맨 아래 스크립트의 `HostName`/`Port` 두 값만 고치면 됩니다. 계정 생성은 관리자가 서버에서 따로 합니다.
+
 **프로필 사진** — 기본 사진은 `index.html`에 base64로 들어 있습니다. 각자 앱에서 바꾼 사진은 `dsail_rows`의 members 행에 저장됩니다.
 
 **무료 플랜** — 일정 기간 아무도 접속하지 않으면 프로젝트가 일시 중지될 수 있습니다. 그러면 대시보드에서 Resume 한 번 누르면 됩니다. 학기 중이라면 사실상 겪지 않습니다.
