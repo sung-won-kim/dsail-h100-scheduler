@@ -1038,8 +1038,7 @@ async function runDiag(){
 // ---------- identity ----------
 // 관리자는 로그인이 아니라 이 명단으로 정합니다. 아래에 멤버 id를 넣으면 관리자 탭이 보입니다.
 const ADMINS=['sungwon-kim'];
-// 크레딧 잔액 제한을 받지 않는 멤버. 예약·송금에서 잔액 검사를 건너뜁니다.
-// 사용량은 그대로 기록되므로 멤버 현황의 사용·예정 숫자는 계속 실제 값입니다.
+// 예약 한 건 96 GPU·시간 제한(MAX_BOOKING_HOURS)을 받지 않는 멤버. 동시 4장 제한은 똑같이 받습니다.
 const UNLIMITED=['sungwon-kim'];
 const isUnlimited=id=>UNLIMITED.includes(id);
 const SYSTEM_ID='__system';       // 관리자 지급/회수의 상대편. 실제 멤버가 아닙니다.
@@ -1211,11 +1210,11 @@ function renderCost(){
   $('#costVal').textContent=nf(cost);
   const pk=(cur&&g&&hrs)?peakConcurrent(cur,r.a,r.z,g):0;
   $('#costAfter').textContent=(g&&hrs)?('= '+g+'장 × '+hrs+'시간'):'';
-  const tooBig=cost>MAX_BOOKING_HOURS,tooMany=pk>MAX_CONCURRENT;
+  const tooBig=!isUnlimited(cur)&&cost>MAX_BOOKING_HOURS,tooMany=pk>MAX_CONCURRENT;
   $('#costBox').classList.toggle('over',tooBig||tooMany);
   $('#parallelHint').textContent=tooBig?'· 한 번에 최대 '+MAX_BOOKING_HOURS+' GPU·시간까지 예약할 수 있어요'
     :tooMany?(pk>g?'· 내 다른 예약과 겹쳐 같은 시각에 '+pk+'장이 돼요 (1인 최대 '+MAX_CONCURRENT+'장)':'· 한 사람이 동시에 쓸 수 있는 GPU는 최대 '+MAX_CONCURRENT+'장이에요')
-    :'· 한 번에 최대 '+MAX_BOOKING_HOURS+' GPU·시간';
+    :isUnlimited(cur)?'· 1회 예약량 제한 없음':'· 한 번에 최대 '+MAX_BOOKING_HOURS+' GPU·시간';
 }
 
 function renderMyBookings(){
@@ -1539,7 +1538,7 @@ async function doBook(gpus,a,z,memo){
   if(z<=a)return '종료 시각이 시작 시각보다 뒤여야 합니다.';
   if(a<0||z>SEASON_HOURS)return '시즌 기간(2026-10-01 ~ 2027-03-31) 안에서만 예약할 수 있습니다.';
   if(a<nowIdx())return '지난 시각은 예약할 수 없습니다.';
-  if(gpus.length*(z-a)>MAX_BOOKING_HOURS)return '한 번에 최대 '+MAX_BOOKING_HOURS+' GPU·시간까지 예약할 수 있어요 (지금 '+gpus.length+'장 × '+(z-a)+'시간 = '+gpus.length*(z-a)+'). 더 필요하면 이어서 새 예약을 한 번 더 해주세요.';
+  if(!isUnlimited(cur)&&gpus.length*(z-a)>MAX_BOOKING_HOURS)return '한 번에 최대 '+MAX_BOOKING_HOURS+' GPU·시간까지 예약할 수 있어요 (지금 '+gpus.length+'장 × '+(z-a)+'시간 = '+gpus.length*(z-a)+'). 더 필요하면 이어서 새 예약을 한 번 더 해주세요.';
   const c=conflictWith(gpus,a,z);
   if(c)return '충돌 · H100 #'+c.hit.join(',#')+'은(는) '+rangeText(c.b.from,c.b.to)+'에 '+memberName(c.b.member)+' 님이 예약했습니다.';
   const pk=peakConcurrent(cur,a,z,gpus.length);
