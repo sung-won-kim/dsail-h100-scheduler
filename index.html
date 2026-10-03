@@ -464,6 +464,19 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   </section>
 
   <section id="tab-server" hidden>
+    <div class="card rules" style="margin-bottom:16px">
+      <h2>서버 사양 <span class="sub">Google Cloud a3-megagpu-8g · 싱가포르(asia-southeast1)</span></h2>
+      <div class="tablewrap"><table class="trbl">
+        <tbody>
+          <tr><td>GPU</td><td><b>NVIDIA H100 80GB HBM3 × 8</b> (SXM, 700W) · 총 GPU 메모리 640GB<br>8장 모두 NVLink로 직접 연결 (GPU 간 약 900GB/s)</td></tr>
+          <tr><td>CPU</td><td>Intel Xeon Platinum 8481C × 2 · <b>104코어 / 208스레드</b></td></tr>
+          <tr><td>메모리</td><td><b>1.8TB</b> RAM</td></tr>
+          <tr><td>저장 공간</td><td><code>/data</code> <b>17TB</b> — 데이터·체크포인트용 (유지됨)<br><code>/ephemeral</code> <b>5.9TB</b> 로컬 NVMe — 가장 빠름, <b>서버를 멈추면 지워질 수 있음</b><br><code>/</code> 193GB — OS와 홈 폴더(<code>~/</code>)</td></tr>
+          <tr><td>소프트웨어</td><td>Ubuntu 24.04 · NVIDIA 드라이버 595.71 · CUDA 13.2까지 지원 · Python 3.12<br>CUDA 툴킷(nvcc)은 없음 — PyTorch 등은 pip/conda 패키지에 포함된 CUDA를 씁니다</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
     <div class="card rules">
       <h2>서버 접속 <span class="sub">문의: 관리자 김성원</span></h2>
       <div class="warn">아이디는 <b>영문 이름 소문자</b>입니다. 예: Sungwon Kim → <code>sungwon</code>, Ki-Bum Kim → <code>kibum</code></div>
@@ -501,9 +514,10 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 
       <h3>5. 저장 공간 · 환경</h3>
       <ul>
-        <li><b>홈 <code>~/</code></b> — 전원이 함께 쓰는 193GB. <b>코드·작은 파일만</b></li>
-        <li><b><code>/data/$USER</code></b> — 내 데이터·체크포인트 (처음에 <code>mkdir -p /data/$USER</code>)</li>
+        <li><b><code>/data/$USER</code></b> (17TB) — 내 데이터·체크포인트 (처음에 <code>mkdir -p /data/$USER</code>)</li>
         <li><b><code>/data/shared</code></b> — 같이 쓰는 데이터셋 (각자 따로 받지 않기)</li>
+        <li><b><code>/ephemeral/$USER</code></b> (5.9TB) — 빠른 임시 공간. 서버를 멈추면 지워질 수 있으니 <b>캐시·중간 결과만</b></li>
+        <li><b>홈 <code>~/</code></b> — OS 디스크(193GB)를 전원이 함께 씁니다. <b>코드·작은 파일만</b></li>
         <li><b>백업 없음</b> — 중요한 건 GitHub 등에 따로 보관</li>
         <li><b>sudo 없음</b> — 패키지는 개인 환경(uv, conda)에 설치. 드라이버·시스템 문제는 김성원에게</li>
       </ul>
