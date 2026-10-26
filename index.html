@@ -190,6 +190,10 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .rules table.trbl th,.rules table.trbl td{border-bottom:1px solid var(--line-2);padding:7px 8px;text-align:left;vertical-align:top}
 .rules table.trbl th{color:var(--ink-2);font-weight:500;background:var(--surface-2)}
 .rules table.trbl td:first-child{font-family:var(--mono);font-size:12px;white-space:nowrap}
+#addUser{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-family:var(--mono);font-size:12.5px;background:var(--surface);width:220px;max-width:100%}
+#addKey{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:12px;background:var(--surface);resize:vertical;line-height:1.5}
+#addMsg{font-size:12.5px;min-height:1em;color:var(--ink-3)}
+#addMsg.bad{color:var(--bad)}
 #sshUser{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-family:var(--mono);font-size:12.5px;background:var(--surface);width:200px;max-width:100%}
 @media (max-width:560px){.rules table.trbl td:first-child{white-space:normal;word-break:break-all}}
 /* dialogs */
@@ -545,18 +549,18 @@ table.members tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
       </ul>
 
       <h3>1. 멤버 추가</h3>
-      <ol>
-        <li>멤버에게 "<b>서버 접속 탭 1번</b>대로 공개키를 보내주세요"라고 안내합니다. 아이디는 <b>영문 이름(first name) 소문자</b>로 정해져 있습니다(예: Ki-Bum Kim → <code>kibum</code>).</li>
-        <li>받은 키가 <code>ssh-ed25519 AAAA...</code> 한 줄인지 확인합니다. <code>-----BEGIN OPENSSH PRIVATE KEY-----</code>면 개인키이므로 지우게 하고 새 키를 만들어 <code>.pub</code>을 다시 받습니다.</li>
-        <li>관리자 계정에서 명단에 추가하고 스크립트를 실행합니다(작은따옴표 유지). <code>ok: 아이디</code>가 나오면 성공입니다.</li>
-      </ol>
-      <div class="cmd"><pre>echo '아이디 ssh-ed25519 AAAA...받은 키 전체...' >> ~/lab-admin/users.txt
-bash ~/lab-admin/add_users.sh</pre><button class="btn small" data-copy>복사</button></div>
-      <ol start="4">
-        <li>확인: <code>id 아이디</code> → 그룹에 <code>dsail</code>이 있고 <code>sudo</code>는 없어야 합니다.</li>
-        <li>예약 연동용 계정 연결은 현재 멤버 26명 모두 미리 해두었습니다. <b>새 멤버</b>가 들어오면 아래 5번대로 한 줄 추가하세요.</li>
-        <li>멤버에게 "<b>계정 만들었어요. 서버 접속 탭 2번부터</b> 따라 하세요"라고 알려줍니다.</li>
-      </ol>
+      <p>① 멤버에게 "<b>서버 접속 탭 1번</b>대로 공개키를 보내주세요"라고 안내합니다.</p>
+      <p>② 받은 공개키와 아이디를 붙여넣습니다. 키에 이름이 들어 있으면 아이디는 자동으로 채워집니다.</p>
+      <p><input id="addUser" list="addUserList" placeholder="아이디 (예: jiwan)" spellcheck="false" autocapitalize="off" autocomplete="off"><datalist id="addUserList"></datalist></p>
+      <p><textarea id="addKey" rows="3" placeholder="받은 공개키 그대로 붙여넣기 (ssh-ed25519 AAAA...)" spellcheck="false"></textarea></p>
+      <p id="addMsg"></p>
+      <p>③ <b>관리자 계정</b>(<code>brev shell dsail-geotransfer</code> → <code>nvidia@...</code>)에서 붙여넣습니다. <code>ok: 아이디</code>가 나오고 그룹에 <code>dsail</code>이 보이면 성공입니다.</p>
+      <div class="cmd"><pre id="addCmd">아이디와 공개키를 넣으면 명령어가 여기에 나옵니다.</pre><button class="btn small" data-copy>복사</button></div>
+      <p>④ 멤버에게 보낼 메시지</p>
+      <div class="cmd"><pre id="addReply" style="white-space:pre-wrap">아이디를 넣으면 메시지가 여기에 나옵니다.</pre><button class="btn small" data-copy>복사</button></div>
+      <ul>
+        <li>예약 연동 계정 연결은 현재 멤버 26명 모두 되어 있습니다. 명단에 없는 <b>새 멤버</b>면 아래 5번대로 한 줄 추가하세요.</li>
+      </ul>
 
       <h3>2. 멤버 삭제</h3>
       <div class="cmd"><pre>sudo deluser --remove-home 아이디</pre><button class="btn small" data-copy>복사</button></div>
@@ -1854,6 +1858,38 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   try{inp.value=localStorage.getItem(KEY)||'';}catch(e){}
   inp.addEventListener('input',()=>{render();try{localStorage.setItem(KEY,inp.value.trim());}catch(e){}});
   render();
+  // 관리자: 아이디 + 공개키 → 서버에 붙여넣을 명령어
+  const aU=document.getElementById('addUser'),aK=document.getElementById('addKey'),aMsg=document.getElementById('addMsg');
+  const aCmd=document.getElementById('addCmd'),aRep=document.getElementById('addReply'),aList=document.getElementById('addUserList');
+  const firstNames=()=>[...document.querySelectorAll('#meSel option')].map(o=>o.value?o.textContent.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g,''):'').filter(Boolean);
+  const fillList=()=>{aList.innerHTML=firstNames().map(n=>'<option value="'+n+'">').join('');};
+  const parseKey=raw=>{
+    const t=raw.replace(/\r/g,'').trim();
+    if(!t)return {err:''};
+    if(/PRIVATE KEY/.test(t))return {err:'개인키입니다. 멤버에게 .pub 파일의 한 줄(ssh-ed25519 ...)을 다시 받아주세요.'};
+    if(t.includes("'"))return {err:'키에 작은따옴표가 들어 있습니다. 받은 키를 다시 확인해 주세요.'};
+    const tk=t.split(/\s+/);
+    if(!/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-\S+|sk-\S+)$/.test(tk[0])||!tk[1])return {err:'ssh-ed25519 AAAA... 형태의 공개키가 아닙니다.'};
+    if(tk[0]==='ssh-ed25519'&&tk[1].length!==68)return {err:'키가 잘렸거나 줄바꿈으로 나뉜 것 같습니다. 한 줄 그대로 다시 받아주세요.'};
+    return {key:tk.join(' '),comment:tk.slice(2).join(' ').toLowerCase()};
+  };
+  const renderAdd=()=>{
+    const k=parseKey(aK.value);
+    if(!aU.value.trim()&&k.comment){const hit=firstNames().sort((a,b)=>b.length-a.length).find(n=>k.comment.includes(n));if(hit)aU.value=hit;}
+    const u=aU.value.trim().toLowerCase();
+    let err=k.err||'';
+    if(!err&&u&&!/^[a-z][a-z0-9_-]{1,31}$/.test(u))err='아이디는 영어 소문자·숫자로, 영문자로 시작해야 합니다.';
+    aMsg.className=err?'bad':'';
+    const known=firstNames();
+    aMsg.textContent=err||(u&&known.length&&!known.includes(u)?'웹앱 명단에 없는 아이디입니다. 새 멤버라면 아래 5번(계정 연결)도 해주세요.':'');
+    aCmd.textContent=(!err&&u&&k.key)
+      ?"echo '"+u+' '+k.key+"' >> ~/lab-admin/users.txt && bash ~/lab-admin/add_users.sh && id "+u
+      :'아이디와 공개키를 넣으면 명령어가 여기에 나옵니다.';
+    aRep.textContent=u
+      ?'계정 만들었어요. 스케줄러 서버 접속 탭 2번에 아이디 '+u+'을(를) 넣고 나오는 명령어를 붙여넣은 다음, ssh dsail_h100 으로 접속하세요.'
+      :'아이디를 넣으면 메시지가 여기에 나옵니다.';
+  };
+  if(aU&&aK){aU.addEventListener('focus',fillList);aU.addEventListener('input',renderAdd);aK.addEventListener('input',renderAdd);}
   document.querySelectorAll('#tab-server [data-copy]').forEach(b=>b.addEventListener('click',async()=>{
     const text=b.previousElementSibling.textContent;
     try{await navigator.clipboard.writeText(text);say('복사했습니다.');}
